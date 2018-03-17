@@ -11,7 +11,10 @@ from signal import SIGTERM
  
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from SocketServer import ThreadingMixIn
-from livestreamer import Livestreamer
+try:
+	from streamlink import Streamlink as Livestreamer
+except:
+	from livestreamer import Livestreamer
 from urllib import unquote
 
 HOST_NAME = ""
