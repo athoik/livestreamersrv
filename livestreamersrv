@@ -11,10 +11,7 @@ from signal import SIGTERM
  
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from SocketServer import ThreadingMixIn
-try:
-	from streamlink import Streamlink as Livestreamer
-except:
-	from livestreamer import Livestreamer
+from streamlink import Streamlink as Livestreamer
 from urllib import unquote
 
 HOST_NAME = ""
@@ -34,7 +31,7 @@ def Stream(wfile, url, quality):
 def Streamer(wfile, url, quality):
     global LIVESTREAMER
     channel = LIVESTREAMER.resolve_url(url)
-    streams = channel.get_streams()
+    streams = channel.streams()
     if not streams:
         raise Exception("No Stream Found!")
     print "Streams:", streams.keys()
