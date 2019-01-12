@@ -18,6 +18,8 @@ HOST_NAME = ""
 PORT_NUMBER = 88
 LIVESTREAMER = None
 
+class NoStream(Exception):
+    pass
 
 def Stream(wfile, url, quality):
     try:
@@ -33,7 +35,7 @@ def Streamer(wfile, url, quality):
     channel = LIVESTREAMER.resolve_url(url)
     streams = channel.streams()
     if not streams:
-        raise Exception("No Stream Found!")
+        raise NoStream("No Stream Found!")
     print "Streams:", streams.keys()
     stream = streams[quality]
     print str(stream)
@@ -48,6 +50,17 @@ def Streamer(wfile, url, quality):
     raise Exception("End Of Data!")
 
 
+def Resolver(url, quality):
+    global LIVESTREAMER
+    channel = LIVESTREAMER.resolve_url(url)
+    streams = channel.streams()
+    if not streams:
+        raise NoStream("No Stream Found!")
+    print "Streams:", streams.keys()
+    stream = streams[quality]
+    print str(stream)
+    return stream.to_url()
+
 class StreamHandler(BaseHTTPRequestHandler):
 
     def do_HEAD(s):
@@ -58,11 +71,6 @@ class StreamHandler(BaseHTTPRequestHandler):
 
     def do_GET(s):
         """Respond to a GET request."""
-        s.send_response(200)
-        s.send_header("Server", "Enigma2 Livestreamer")
-        s.send_header("Content-type", "text/html")
-        s.end_headers()
-
         url=unquote(s.path[1:])
         quality="best"
 
@@ -72,6 +80,31 @@ class StreamHandler(BaseHTTPRequestHandler):
             url = url[i+1:]
 
         s.log_message("URL: %s Quality: %s", url, quality)
+
+        try: # to resolve quality specified as url
+            new_url = Resolver(url, quality)
+            s.log_message("URL: %s resolved to new URL: %s", url, new_url)
+            s.send_response(302)
+            s.send_header("Server", "Enigma2 Livestreamer")
+            s.send_header("Location", new_url)
+            s.end_headers()
+            return
+        except NoStream:
+            s.log_message("URL: %s has no streams active" % url)
+            s.send_response(200)
+            s.send_header("Server", "Enigma2 Livestreamer")
+            s.send_header("Content-type", "video/mp4")
+            s.end_headers()
+            s.wfile.write(open("/usr/share/offline.mp4", "r").read())
+            s.wfile.close()
+            return
+        except:
+            pass
+
+        s.send_response(200)
+        s.send_header("Server", "Enigma2 Livestreamer")
+        s.send_header("Content-type", "application/octet-stream")
+        s.end_headers()
         Stream(s.wfile, url, quality)
 
 
