@@ -6,39 +6,44 @@ import os
 import sys
 import time
 import atexit
+import syslog
 
 from signal import SIGTERM
  
 from BaseHTTPServer import HTTPServer, BaseHTTPRequestHandler
 from SocketServer import ThreadingMixIn
-from streamlink import Streamlink as Livestreamer
 from urllib import unquote
 
 HOST_NAME = ""
 PORT_NUMBER = 88
-LIVESTREAMER = None
 
 class NoStream(Exception):
     pass
+
+def log(str):
+    print(str)
+    syslog.syslog(str)
 
 def Stream(wfile, url, quality):
     try:
         Streamer(wfile, url, quality)
     except Exception as e:
-        print "Got Exception: ", str(e)
+        log("Got Exception: %s" % str(e))
         wfile.write(open("/usr/share/offline.mp4", "r").read())
     wfile.close()
 
 
 def Streamer(wfile, url, quality):
-    global LIVESTREAMER
-    channel = LIVESTREAMER.resolve_url(url)
+    from streamlink import Streamlink
+    channel = Streamlink().resolve_url(url)
+    log(str(channel))
     streams = channel.streams()
+    log(str(streams))
     if not streams:
         raise NoStream("No Stream Found!")
-    print "Streams:", streams.keys()
+    log("Streams: %s" % streams.keys())
     stream = streams[quality]
-    print str(stream)
+    log(str(stream))
     fd = stream.open()
     while True:
         buff = fd.read(4096)
@@ -51,14 +56,14 @@ def Streamer(wfile, url, quality):
 
 
 def Resolver(url, quality):
-    global LIVESTREAMER
-    channel = LIVESTREAMER.resolve_url(url)
+    from streamlink import Streamlink
+    channel = Streamlink().resolve_url(url)
     streams = channel.streams()
     if not streams:
         raise NoStream("No Stream Found!")
-    print "Streams:", streams.keys()
+    log("Streams: %s" % streams.keys())
     stream = streams[quality]
-    print str(stream)
+    log(str(stream))
     return stream.to_url()
 
 class StreamHandler(BaseHTTPRequestHandler):
@@ -79,18 +84,18 @@ class StreamHandler(BaseHTTPRequestHandler):
             quality = url[2:i]
             url = url[i+1:]
 
-        s.log_message("URL: %s Quality: %s", url, quality)
+        log("URL: %s Quality: %s" % (url, quality))
 
         try: # to resolve quality specified as url
             new_url = Resolver(url, quality)
-            s.log_message("URL: %s resolved to new URL: %s", url, new_url)
+            log("URL: %s resolved to new URL: %s" % (url, new_url))
             s.send_response(302)
             s.send_header("Server", "Enigma2 Livestreamer")
             s.send_header("Location", new_url)
             s.end_headers()
             return
         except NoStream:
-            s.log_message("URL: %s has no streams active" % url)
+            log("URL: %s has no streams active" % url)
             s.send_response(200)
             s.send_header("Server", "Enigma2 Livestreamer")
             s.send_header("Content-type", "video/mp4")
@@ -113,11 +118,11 @@ class ThreadedHTTPServer(ThreadingMixIn, HTTPServer):
 
 
 def start():
-    global LIVESTREAMER
-    LIVESTREAMER = Livestreamer()
     httpd = ThreadedHTTPServer((HOST_NAME, PORT_NUMBER), StreamHandler)
     print time.asctime(), "Server Starts - %s:%s" % (HOST_NAME, PORT_NUMBER)
     try:
+        # we need valid time in order https certificates to work
+        os.system("ntpd -nqp pool.ntp.org")
         httpd.serve_forever()
     except KeyboardInterrupt:
         pass
