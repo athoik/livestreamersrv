@@ -3,9 +3,10 @@
 # Linux Python2/3 Streamlink Daemon
 #
 # Copyright (c) 2017 - 2021 Billy2011 @vuplus-support.org
+# License: GPLv2+
 #
 
-__version__ = "1.7.0"
+__version__ = "1.8.2"
 
 import atexit
 import errno
@@ -45,6 +46,8 @@ from streamlink import __version__ as streamlink_version
 from streamlink import __version_date__ as streamlink_version_date
 from streamlink import plugins
 from streamlink.exceptions import FatalPluginError
+from streamlink.stream import HTTPStream
+from streamlink.stream.ffmpegmux import MuxedStream
 
 try:
 	from streamlink import opts_parser
@@ -241,11 +244,22 @@ def Stream(streamlink, http, url, argstr, quality):
 		else:
 			alt_streams = []
 
+		if opts_parser_version >= "0.2.8" and args.http_add_audio:
+			http_add_audio = HTTPStream(streamlink, args.http_add_audio)
+		else:
+			http_add_audio = False
+
 		stream_names = [stream_name] + alt_streams
 		for stream_name in stream_names:
 			stream = streams[stream_name]
 			stream_type = type(stream).shortname()
+
+			if http_add_audio and stream_type in ("hls", "http", "rtmp"):
+				stream = MuxedStream(streamlink, stream, http_add_audio, add_audio=True)
+				stream_type = "muxed-stream"
+
 			LOGGER.info("Opening stream: {0} ({1})".format(stream_name, stream_type))
+
 			if stream_type in args.player_passthrough:
 				LOGGER.debug("301 Passthrough - URL: {0}".format(stream_to_url(stream)))
 				http.send_response(301)
@@ -257,7 +271,7 @@ def Stream(streamlink, http, url, argstr, quality):
 				break
 
 		if not prebuffer:
-			raise StreamError("Could not open stream {0}, tried {1} times, exiting", stream, args.retry_open)
+			raise StreamError("Could not open stream, tried {0} times, exiting".format(args.retry_open))
 
 		LOGGER.debug("Writing stream to player")
 		not_stream_opened = False
@@ -284,6 +298,8 @@ def Stream(streamlink, http, url, argstr, quality):
 			LOGGER.error("Got exception: {0}\n{1}", err, traceback.format_exc().splitlines())
 
 		sendOfflineMP4(http, send_headers=not_stream_opened)
+	except KeyboardInterrupt:
+		pass
 	finally:
 		if fd:
 			LOGGER.info("Stream ended")
@@ -392,11 +408,14 @@ def start():
 
 	streamlink = Streamlink2()
 	del streamlink
+	signal.signal(signal.SIGTSTP, signal.default_int_handler)
+	signal.signal(signal.SIGQUIT, signal.default_int_handler)
+	signal.signal(signal.SIGTERM, signal.default_int_handler)
 
 	try:
 		httpd.serve_forever()
 	except KeyboardInterrupt:
-		pass
+		LOGGER.info("Interrupted! Exiting...")
 	httpd.server_close()
 	LOGGER.info("{0} Server stopped - Host: {1}, Port: {2}", time.asctime(), hostname(), PORT_NUMBER)
 
