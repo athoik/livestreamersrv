@@ -35,15 +35,16 @@ def Stream(wfile, url, quality):
 
 def Streamer(wfile, url, quality):
     from streamlink import Streamlink
-    channel = Streamlink().resolve_url(url)
-    log(str(channel))
-    streams = channel.streams()
+    pluginclass, resolved_url = Streamlink().resolve_url(url)
+    plugin = pluginclass(resolved_url)
+    log("Found matching plugin {0} for URL {1}".format(plugin.module, resolved_url))
+    streams = plugin.streams()
     log(str(streams))
     if not streams:
         raise NoStream("No Stream Found!")
     log("Streams: %s" % streams.keys())
     stream = streams[quality]
-    log(str(stream))
+    log("Stream: %s" % str(stream))
     fd = stream.open()
     while True:
         buff = fd.read(4096)
@@ -57,13 +58,14 @@ def Streamer(wfile, url, quality):
 
 def Resolver(url, quality):
     from streamlink import Streamlink
-    channel = Streamlink().resolve_url(url)
-    streams = channel.streams()
+    pluginclass, resolved_url = Streamlink().resolve_url(url)
+    plugin = pluginclass(resolved_url)
+    streams = plugin.streams()
     if not streams:
         raise NoStream("No Stream Found!")
     log("Streams: %s" % streams.keys())
     stream = streams[quality]
-    log(str(stream))
+    log("Stream: %s" %  str(stream))
     return stream.to_url()
 
 class StreamHandler(BaseHTTPRequestHandler):
