@@ -34,7 +34,7 @@ def Stream(wfile, url, quality):
         Streamer(wfile, url, quality)
     except Exception as e:
         log("Got Exception: %s" % str(e))
-        wfile.write(open("/usr/share/offline.mp4", "r").read())
+        wfile.write(open("/usr/share/offline.mp4", "rb").read())
     wfile.close()
 
 
@@ -107,7 +107,7 @@ class StreamHandler(BaseHTTPRequestHandler):
             s.send_header("Server", "Enigma2 Livestreamer")
             s.send_header("Content-type", "video/mp4")
             s.end_headers()
-            s.wfile.write(open("/usr/share/offline.mp4", "r").read())
+            s.wfile.write(open("/usr/share/offline.mp4", "rb").read())
             s.wfile.close()
             return
         except:
