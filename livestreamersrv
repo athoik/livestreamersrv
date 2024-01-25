@@ -40,10 +40,7 @@ def Stream(wfile, url, quality):
 
 def Streamer(wfile, url, quality):
     from streamlink import Streamlink
-    pluginclass, resolved_url = Streamlink().resolve_url(url)
-    plugin = pluginclass(resolved_url)
-    log("Found matching plugin {0} for URL {1}".format(plugin.module, resolved_url))
-    streams = plugin.streams()
+    streams = Streamlink().streams(url)
     log(str(streams))
     if not streams:
         raise NoStream("No Stream Found!")
@@ -60,12 +57,9 @@ def Streamer(wfile, url, quality):
     fd = None
     raise Exception("End Of Data!")
 
-
 def Resolver(url, quality):
     from streamlink import Streamlink
-    pluginclass, resolved_url = Streamlink().resolve_url(url)
-    plugin = pluginclass(resolved_url)
-    streams = plugin.streams()
+    streams = Streamlink().streams(url)
     if not streams:
         raise NoStream("No Stream Found!")
     log("Streams: %s" % list(streams.keys()))
